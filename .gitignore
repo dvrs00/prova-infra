@@ -1,5 +1,13 @@
 .terraform/
 *.tfstate
 *.tfstate.backup
-node_modules/
-.env 
+.terraform.lock.hcl
+*.tfvars
+*.auto.tfvars
+*.log
+.DS_Store
+Thumbs.db
+*.pem
+*.key
+id_rsa
+.env

@@ -2,23 +2,43 @@ trigger:
 - main
 
 pool:
-  name: 'Default'
+  name: 'Default' 
+
 variables:
-  imageName: 'dvrsdev/douglasprovacloud' 
-  tag: 'latest' 
+  imageName: 'dvrsdev/douglasprovacloud'
+  tag: 'latest'
+  keyPath: '/home/dvrs/myagent/ec2-key.pem' 
+  ec2Ip: '54.87.96.92' 
 
-steps:
-- task: Docker@2
-  displayName: Login no Docker Hub
-  inputs:
-    command: login
-    containerRegistry: 'dockerhub-connection' 
+stages:
+- stage: Build
+  displayName: Build and Push Docker
+  jobs:
+  - job: Build
+    steps:
+    - task: Docker@2
+      displayName: Login Docker Hub
+      inputs:
+        command: login
+        containerRegistry: 'dockerhub-connection'
 
-- task: Docker@2
-  displayName: Build and Push
-  inputs:
-    command: buildAndPush
-    repository: $(imageName)
-    Dockerfile: 'app/Dockerfile' 
-    tags: |
-      $(tag)
+    - task: Docker@2
+      displayName: Build and Push
+      inputs:
+        command: buildAndPush
+        repository: $(imageName)
+        Dockerfile: 'app/Dockerfile'
+        tags: |
+          $(tag)
+
+- stage: Deploy
+  displayName: Deploy na EC2
+  dependsOn: Build 
+  condition: succeeded()
+  jobs:
+  - job: DeployEC2
+    steps:
+    - script: |
+        echo "--- Iniciando Deploy na EC2 $(ec2Ip) ---"
+        ssh -o StrictHostKeyChecking=no -i $(keyPath) ubuntu@$(ec2Ip) "cd /opt/prova-app && sudo docker compose pull && sudo docker compose up -d"
+      displayName: 'Executar SSH Update'

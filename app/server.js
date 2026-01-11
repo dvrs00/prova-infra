@@ -1,7 +1,6 @@
 const http = require('http');
 const { Client } = require('pg');
 
-// As variáveis vêm do Docker Compose (Environment)
 const dbConfig = {
   user: process.env.DB_USER || 'admin',
   host: process.env.DB_HOST,
@@ -11,7 +10,7 @@ const dbConfig = {
 };
 
 const server = http.createServer(async (req, res) => {
-    // Log para ver no CloudWatch/Docker logs
+    // logs para ver no cloudwatch
     console.log(`[${new Date().toISOString()}] Request: ${req.method} ${req.url}`);
 
     if (req.url === '/health' || req.url === '/') {
@@ -21,10 +20,9 @@ const server = http.createServer(async (req, res) => {
 
         try {
             await client.connect();
-            // Traz dados reais para provar o requisito da prova
             const resDb = await client.query('SELECT * FROM usuarios');
             dados = resDb.rows;
-            dbStatus = 'CONECTADO COM SUCESSO';
+            dbStatus = 'CONECTADO COM SUCESSO (DB)';
             await client.end();
         } catch (err) {
             dbStatus = 'ERRO DE CONEXAO: ' + err.message;
@@ -32,7 +30,10 @@ const server = http.createServer(async (req, res) => {
         }
 
         const response = {
-            environment: 'Production (Terraform + CI/CD)',
+            message: '🚀 DEPLOY AUTOMÁTICO FUNCIONOU! 🚀', 
+            version: '2.0.0 (Versão atualizada via Azure DevOps)', 
+            environment: 'Production',
+            updated_at: new Date().toISOString(), 
             status_app: 'Online',
             status_db: dbStatus,
             data: dados
