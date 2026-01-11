@@ -2,7 +2,8 @@ trigger:
 - main
 
 pool:
-  vmImage: 'Default'
+  name: 'Default'
+  
 variables:
   imageName: 'dvrsdev/douglasprovacloud' 
   tag: 'latest' 
