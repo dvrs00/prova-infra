@@ -3,7 +3,6 @@ trigger:
 
 pool:
   name: 'Default'
-  
 variables:
   imageName: 'dvrsdev/douglasprovacloud' 
   tag: 'latest' 
