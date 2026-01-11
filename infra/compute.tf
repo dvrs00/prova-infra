@@ -26,7 +26,7 @@ resource "aws_instance" "app" {
   key_name               = "ec2-bootstrap"
   vpc_security_group_ids = [aws_security_group.sg_public.id]
 
-  user_data_replace_on_change = true # vamos recriar a instância se o user_data mudar
+  user_data_replace_on_change = true 
 
   user_data = templatefile("${path.module}/user_data/setup_app.sh", {
     db_ip_injecao = aws_instance.db.private_ip
@@ -37,7 +37,7 @@ resource "aws_instance" "app" {
   depends_on = [aws_instance.db]
 }
 
-resource "aws_eip" "app_eip" {
-  instance = aws_instance.app.id
-  domain   = "vpc"
+resource "aws_eip_association" "eip_assoc" {
+  instance_id   = aws_instance.app.id
+  allocation_id = "eipalloc-000eaeb5222b8a841" 
 }
