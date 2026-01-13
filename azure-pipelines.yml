@@ -8,6 +8,7 @@ variables:
   imageName: 'dvrsdev/douglasprovacloud'
   tag: 'latest'
   keyPath: '/home/dvrs/myagent/ec2-key.pem' 
+  ec2Ip: '44.214.188.179'
 
 stages:
 - stage: Build
