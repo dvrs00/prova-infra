@@ -46,11 +46,7 @@ A rede foi provisionada do zero via Terraform na região `us-east-1` (N. Virgini
 
 Toda a infraestrutura é gerenciada como código (IaC).
 
-```bash 
-cd infra 
-terraform init 
-terraform apply --auto-approve
-```
+alterar aqui com o codigo bash
 
 **Automação de Boot:** Utilizei scripts `user_data` para que as instâncias já iniciem com Docker e AWS CLI instalados e configurados, eliminando etapas manuais pós-provisionamento.
 
@@ -67,7 +63,8 @@ O deploy é gerenciado pelo `azure-pipelines.yml`:
 
 | Decisão | Motivo da Escolha |
 |-------|--------------------|
-| **IAM Roles** | Para eliminar o risco de chaves de acesso fixas (`AWS_ACCESS_KEY`) nos servidores, atribuí **IAM Roles** às instâncias, permitindo autenticação segura e rotativa para S3 e CloudWatch. |
+| **IAM & PoLP** | Adoção do **Princípio do Menor Privilégio (PoLP)**. Em vez de chaves de acesso fixas (`AWS_ACCESS_KEY`), atribuí **IAM Roles** às instâncias com permissões granulares (apenas escrita de logs no CloudWatch e leitura de parâmetros necessários), garantindo segurança e rotação automática de credenciais. |
+| **Estratégia SSL (Self-Signed)** | Para garantir criptografia ponta a ponta (Cloudflare -> EC2) sem a complexidade de validação de DNS (Certbot) durante o boot efêmero da máquina, implementei a geração automática de um certificado **Self-Signed via OpenSSL** no script de inicialização (`user-data`). O Nginx força HTTPS internamente, enquanto o Cloudflare garante o SSL confiável na borda. |
 | **NAT Gateway** | Optei pelo uso do **NAT Gateway** gerenciado pela AWS. Embora tenha um custo maior e não seja Free Tier, a escolha se deve à estabilidade e segurança superiores em comparação a uma "NAT Instance" manual, aproveitando os créditos disponíveis na conta. |
 | **Docker Compose** | A containerização total do ambiente (App, Banco, Proxy, Monitoramento) garante que o comportamento seja idêntico entre o ambiente de desenvolvimento e produção. |
 | **Agente Self-Hosted** | Devido à fila de espera nos agentes gratuitos da Microsoft, configurei um agente na minha própria infraestrutura para garantir agilidade e controle nos deploys. |
@@ -153,5 +150,3 @@ Como evidência de controle e uso do Free Tier (exceto NAT Gateway), segue o rep
 ![Custos AWS Console 2](./prints/custos_aws_console2.png)
 
 ---
-
-**Desenvolvido por dvrs**
