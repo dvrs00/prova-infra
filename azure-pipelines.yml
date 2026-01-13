@@ -39,26 +39,11 @@ stages:
   - job: DeployEC2
     steps:
     - script: |
-        echo "--- Verificando Terraform ---"
-        terraform -version || { echo "Terraform não encontrado no agente!"; exit 1; }
-        
-        echo "--- Lendo IP da pasta Infra ---"
-        cd infra
-        
-        IP_LIDO=$(terraform output -raw app_public_ip)
-        
-        echo "IP Recuperado do Terraform: $IP_LIDO"
-        
-        # azure devops transforma o texto bash em variável de pipeline 
-        echo "##vso[task.setvariable variable=ec2Ip]$IP_LIDO"
-      displayName: 'Obter IP Dinâmico da Infra'
-
-    - script: |
         echo "--- Ajustando permissão da chave (Segurança) ---"
         chmod 400 $(keyPath)
 
         echo "--- Iniciando Conexão SSH em $(ec2Ip) ---"
         
-        # conecta -> entra na pasta -> baixa a imagem nova -> recria o container
+        # Agora ele vai usar o IP '44.214.188.179' que definimos lá em cima
         ssh -o StrictHostKeyChecking=no -i $(keyPath) ubuntu@$(ec2Ip) "cd /opt/prova-app && sudo docker compose pull && sudo docker compose up -d --force-recreate"
       displayName: 'Executar Deploy Remoto'
