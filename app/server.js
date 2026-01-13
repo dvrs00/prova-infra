@@ -22,16 +22,16 @@ const server = http.createServer(async (req, res) => {
             await client.connect();
             const resDb = await client.query('SELECT * FROM usuarios');
             dados = resDb.rows;
-            dbStatus = 'CONECTADO COM SUCESSO (DB)';
+            dbStatus = 'Conectado com sucesso!';
             await client.end();
         } catch (err) {
-            dbStatus = 'ERRO DE CONEXAO: ' + err.message;
+            dbStatus = 'Erro de conexão: ' + err.message;
             console.error('DB Error:', err);
         }
 
         const response = {
-            message: '🚀 DEPLOY AUTOMÁTICO FUNCIONOU! 🚀', 
-            version: '2.0.0 (Versão atualizada via Azure DevOps)', 
+            message: '🚀 O deploy automático funcionou! 🚀', 
+            version: '2.0.0', 
             environment: 'Production',
             updated_at: new Date().toISOString(), 
             status_app: 'Online',

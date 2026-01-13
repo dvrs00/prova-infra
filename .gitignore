@@ -11,3 +11,4 @@ Thumbs.db
 *.key
 id_rsa
 .env
+terraform.tfvars

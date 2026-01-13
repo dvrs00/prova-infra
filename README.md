@@ -1,106 +1,157 @@
-# 🚀 Desafio de Infraestrutura Cloud, Redes e Containers
+# 🚀 Desafio de Infraestrutura Cloud (AWS), DevOps e Automação
 
-Este repositório contém a solução para o desafio técnico de infraestrutura, implementando um ambiente funcional na AWS com segmentação de rede, containerização total e automação via Terraform e Azure DevOps.
+Este repositório contém a solução completa que desenvolvi para o desafio técnico. O projeto entrega um ambiente funcional na AWS, com foco em segurança, automação total (IaC) e monitoramento, aplicando práticas modernas de mercado.
 
-## 📋 1. Descrição da Arquitetura
+---
 
-A infraestrutura foi desenhada seguindo as melhores práticas de mercado (Three-Tier Architecture adaptado), garantindo segurança, alta disponibilidade e facilidade de gerenciamento.
+## 📋 1. Arquitetura da Solução
 
-* **Cloud Provider:** AWS (Free Tier elegível, com exceção do NAT Gateway).
-* **Rede (VPC):**
-    * **Subnet Pública:** Hospeda a camada de Apresentação/Proxy. Acessível via Internet Gateway.
-    * **Subnet Privada:** Hospeda a camada de Dados. Sem acesso direto de entrada da internet (protegida), mas com saída via NAT Gateway para atualizações.
-* **Componentes:**
-    * **Proxy Reverso (Nginx):** Recebe o tráfego HTTP na porta 80 e encaminha internamente para a aplicação.
-    * **Aplicação (Node.js):** API REST que consulta o banco de dados.
-    * **Banco de Dados (PostgreSQL):** Isolado na rede privada, acessível apenas pela aplicação.
-* **Fluxo de Dados:**
-    `Cliente -> Cloudflare (DNS) -> EC2 Pública (Nginx -> Node App) -> EC2 Privada (Postgres)`
+O desenho da infraestrutura prioriza a **segurança dos dados** e a **alta disponibilidade**. A estratégia central foi isolar os recursos críticos em camadas de rede distintas.
+
+### 🏗️ Estrutura de Rede (AWS VPC)
+
+A rede foi provisionada do zero via Terraform na região `us-east-1` (N. Virginia), organizada da seguinte forma:
+
+- **Rede Pública (Public Subnet - `10.0.1.0/24`):**
+  - Hospeda a **Aplicação (Node.js)**, o **Proxy Reverso (Nginx)** e o **Grafana**.
+  - Possui um **Internet Gateway** para entrada de tráfego e um **Elastic IP** para garantir estabilidade de DNS.
+
+- **Rede Privada (Private Subnet - `10.0.2.0/24`):**
+  - Dedicada exclusivamente ao **Banco de Dados (PostgreSQL)**.
+  - **Segurança:** Sem endereço IP público, impedindo qualquer acesso direto da internet.
+  - **Conectividade:** Utiliza um **NAT Gateway** para saída segura (atualizações e backups), sem expor a porta de entrada.
+
+> **Nota Técnica:** Em um cenário corporativo crítico, a boa prática seria separar fisicamente a aplicação do sistema de monitoramento. Isso garantiria a observabilidade mesmo em casos de esgotamento de recursos do servidor principal. Para este desafio, optei pela consolidação visando eficiência de recursos.
+
+### 🔄 Fluxo de Dados
+
+1. Acesso ao domínio `provadouglas.uzzipay.com` (Cloudflare).
+2. Requisição chega à AWS via Elastic IP.
+3. **Nginx** (Proxy Reverso) recebe na porta 80/443 e encaminha para a API.
+4. Aplicação consome o Banco de Dados através da rede privada.
+
+![Diagrama da Arquitetura](./prints/arquitetura.png)  
 
 ---
 
 ## 🛠️ 2. Instalação e Configuração
 
 ### Pré-requisitos
-* Conta AWS ativa.
-* Terraform instalado.
-* Conta no Azure DevOps (com Pool de Agentes configurado).
-* Docker Hub Account.
 
-### Passo 1: CI/CD (Build da Aplicação)
-O pipeline no **Azure DevOps** monitora a branch `main`.
-1.  O commit dispara o pipeline no agente **Self-Hosted**.
-2.  O Docker realiza o build da imagem baseado no `app/Dockerfile`.
-3.  A imagem é enviada (Push) para o Docker Hub: `dvrsdev/douglasprovacloud:latest`.
+- Conta AWS ativa.
+- Terraform instalado.
+- Azure DevOps com agente configurado (Self-Hosted).
 
-### Passo 2: Provisionamento (Terraform)
-A infraestrutura é 100% código (IaC).
-1.  Acesse a pasta `infra/`.
-2.  Inicialize o Terraform:
-    ```bash
-    terraform init
-    ```
-3.  Aplique a infraestrutura:
-    ```bash
-    terraform apply --auto-approve
-    ```
-    *Este comando provisiona VPC, Subnets, NAT Gateway, Security Groups e as EC2s. Os scripts de `user_data` configuram o Docker e sobem os containers automaticamente.*
+### Passo 1: Provisionamento (Terraform)
 
-### Passo 3: Configuração do DNS (Cloudflare)
-1.  Após o provisionamento, capture o **Elastic IP** exibido no output do Terraform ou console AWS.
-2.  O apontamento do domínio para o IP público da EC2 feito no Cloudflare, foi realizado pelo Lucas Cruz, com um domínio da uzzipay, conforme instruído na prova.
-3.  O tráfego passará pelo proxy da Cloudflare antes de chegar na AWS.
+Toda a infraestrutura é gerenciada como código (IaC).
+
+```bash 
+cd infra 
+terraform init 
+terraform apply --auto-approve
+```
+
+**Automação de Boot:** Utilizei scripts `user_data` para que as instâncias já iniciem com Docker e AWS CLI instalados e configurados, eliminando etapas manuais pós-provisionamento.
+
+### Passo 2: Pipeline CI/CD (Azure DevOps)
+
+O deploy é gerenciado pelo `azure-pipelines.yml`:
+
+- **Build:** Gera a imagem Docker e envia ao Docker Hub.
+- **Deploy Dinâmico:** O pipeline consulta o Terraform para obter o IP atual do servidor e realiza a atualização dos containers via SSH automaticamente.
 
 ---
 
 ## 💡 3. Decisões Técnicas e Justificativas
 
-| Decisão | Justificativa |
-| :--- | :--- |
-| **Terraform (IaC)** | Inicialmente, a infraestrutura foi criada manualmente via Console AWS. Porém, a gestão de múltiplos recursos (VPC, SG, Subnets) tornou-se complexa e propensa a erros. Migrei para Terraform para ter controle total, permitindo criar e **destruir** o ambiente com um comando, facilitando a gestão de custos. |
-| **NAT Gateway (Managed)** | Optei pelo NAT Gateway nativo da AWS em vez de uma "NAT Instance" manual. Embora tenha custo, é a prática de mercado para garantir estabilidade e escalabilidade sem necessidade de gerenciar patches de segurança de uma instância extra. O custo foi controlado destruindo o ambiente via Terraform após os testes. |
-| **Agent Self-Hosted** | Devido às restrições recentes da Microsoft para "Parallel Jobs" em contas gratuitas (com liberação demorada), configurei um Agente Self-Hosted localmente para garantir que o pipeline de CI rodasse imediatamente, sem bloquear o progresso da prova. |
-| **Nginx Containerizado** | Para cumprir rigorosamente o requisito de "Tudo containerizado" e garantir a imutabilidade da EC2. Se a instância for recriada, o Nginx sobe configurado automaticamente, sem intervenção manual. |
+| Decisão | Motivo da Escolha |
+|-------|--------------------|
+| **IAM Roles** | Para eliminar o risco de chaves de acesso fixas (`AWS_ACCESS_KEY`) nos servidores, atribuí **IAM Roles** às instâncias, permitindo autenticação segura e rotativa para S3 e CloudWatch. |
+| **NAT Gateway** | Optei pelo uso do **NAT Gateway** gerenciado pela AWS. Embora tenha um custo maior e não seja Free Tier, a escolha se deve à estabilidade e segurança superiores em comparação a uma "NAT Instance" manual, aproveitando os créditos disponíveis na conta. |
+| **Docker Compose** | A containerização total do ambiente (App, Banco, Proxy, Monitoramento) garante que o comportamento seja idêntico entre o ambiente de desenvolvimento e produção. |
+| **Agente Self-Hosted** | Devido à fila de espera nos agentes gratuitos da Microsoft, configurei um agente na minha própria infraestrutura para garantir agilidade e controle nos deploys. |
 
 ---
 
-## ⚠️ 4. Problemas Encontrados e Soluções
+## 🛡️ 4. Backup e Segurança
 
-### 1. Indisponibilidade de Agentes no Azure DevOps
-* **Problema:** O pipeline falhava pois a conta gratuita do Azure DevOps não tinha *parallel jobs* liberados pela Microsoft (prazo de liberação era longo).
-* **Solução:** Configurei um **Agente Self-Hosted** na minha própria máquina, conectando-o ao Azure DevOps. Isso permitiu fazer o build e push da imagem Docker sem depender da fila da Microsoft.
+### Estratégia de Disaster Recovery
 
-### 2. Gerenciamento e Limpeza de Recursos
-* **Problema:** Ao iniciar a prova pelo Console AWS, perdi o rastreio de alguns recursos (Security Groups órfãos), dificultando a limpeza e gerando risco de cobrança desnecessária.
-* **Solução:** Adotei o **Terraform**. Isso me deu confiança para usar recursos melhores (como o NAT Gateway) sabendo que um simples `terraform destroy` limparia 100% do ambiente, evitando surpresas na fatura.
+Implementei duas camadas de proteção para os dados:
 
-### 3. Conectividade da Instância Privada
-* **Problema:** A EC2 de Banco de Dados (Privada) não conseguia baixar o Docker e as imagens, pois não tinha IP público.
-* **Solução:** Implementação do **NAT Gateway** na subnet pública e configuração das tabelas de rota (Route Tables) para permitir que a subnet privada tivesse saída para a internet, mantendo-se fechada para entrada.
+1.  **Backup Lógico (Off-site):** Script automatizado no `crontab` gera dumps do banco a cada 12 horas e envia para um **Bucket S3**.
+2.  **Backup Físico (Snapshot):** Configuração do AWS Data Lifecycle Manager (DLM) para snapshots automáticos do volume EBS.
+    - **Política:** Execução a cada 12h (início às 09:00 UTC).
+    - **Retenção:** Mantém os últimos 3 snapshots (janela de ~1.5 dias) para otimização de custos.
 
-### 4. Race Condition (App x Banco)
-* **Problema:** O container da aplicação iniciava antes do banco estar pronto para aceitar conexões, gerando erro fatal.
-* **Solução:** Adicionei lógica de *Retry* na aplicação Node.js e configurei `healthcheck` robusto no Docker Compose do banco.
+![Política de Snapshot](./prints/snapshot_policy.png)
+
+### Segurança de Rede (Security Groups)
+
+O controle de acesso ao banco de dados não é feito por IP, mas por **Referência de Grupo**. O Security Group do banco aceita conexões na porta 5432 apenas se a origem for o `prova-public-sg` (Grupo da Aplicação). Isso garante isolamento total independente do endereçamento de rede.
 
 ---
 
-## 🌐 5. Dados de Acesso e Evidências
+## 📊 5. Observabilidade
 
-* **URL da Aplicação:** `http://provadouglas.uzzipay.com`
-* **Endpoint de Teste:** `/` ou `/health`
+A estratégia de monitoramento combina visualização gráfica e diagnóstico em tempo real.
 
-### Exemplo de Retorno JSON
-```json
-{
-  "environment": "Production (Terraform + CI/CD)",
-  "status_app": "Online",
-  "status_db": "CONECTADO COM SUCESSO",
-  "data": [
-    {
-      "id": 1,
-      "nome": "Douglas",
-      "cargo": "DevOps/NOC1",
-      "situacao": "Aprovado"
-    }
-  ]
-}
+### A. Grafana + CloudWatch
+Monitoramento centralizado via **Grafana** (porta 3001), integrado nativamente via IAM Role.
+
+![Dashboard Grafana](./prints/grafana_ec2.png)
+
+### B. Diagnóstico via Terminal
+Para validação profunda de recursos, utilizo ferramentas de CLI (`docker stats` e `htop`) diretamente na instância.
+
+- Docker Stats - EC2 Pública: 
+
+![Docker Stats - EC2 Pública](./prints/observabilidade_docker_stats_ec2_publica.png)
+
+- htop - EC2 Pública: 
+
+![htop - EC2 Pública](./prints/observabilidade_htop_ec2_publica.png)
+
+- Docker Stats - EC2 Privada: 
+
+![Docker Stats - EC2 Privada](./prints/observabilidade_docker_stats_ec2_privada.png)
+
+- htop - EC2 Privada: 
+
+![htop - EC2 Privada](./prints/observabilidade_htop_ec2_privada.png)
+
+
+---
+
+## 🖼️ 6. Evidências de Entrega
+
+- **A. Aplicação Rodando:** API respondendo com sucesso e conectada ao banco privado.
+  ![App Browser](./prints/app_browser.png)
+
+- **B. Pipeline de Sucesso:** Execução completa no Azure DevOps.
+  ![Pipeline Azure](./prints/pipeline.png)
+
+- **C. Backup no S3:** Arquivos `.sql` gerados no bucket.
+  ![Backup S3](./prints/backup_s3.png)
+
+- **D. Containers Ativos - EC2 Pública:** Output do comando `docker ps`.
+  ![Docker PS EC2 Pública](./prints/docker_ps_ec2_publica.png)
+
+- **E. Containers Ativos - EC2 Privada:** Output do comando `docker ps`.
+  ![Docker PS EC2 Privada](./prints/docker_ps_ec2_privada.png)
+
+---
+
+## ⚠️ Nota sobre Custos (FinOps)
+
+O dashboard de custos do Grafana não populou dados gráficos consistentes. Acredito que o motivo mais provável seja o *delay* padrão de processamento do AWS Cost Explorer (que pode levar até 24h) somado aos valores muito baixos (micropagamentos) gerados durante o curto período de testes.
+
+Como evidência de controle e uso do Free Tier (exceto NAT Gateway), segue o report direto do **AWS Billing Console**:
+
+![Custos AWS Console](./prints/custos_aws_console.png)
+![Custos AWS Console 2](./prints/custos_aws_console2.png)
+
+---
+
+**Desenvolvido por dvrs**
